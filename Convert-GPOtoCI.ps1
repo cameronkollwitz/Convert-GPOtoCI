@@ -12,29 +12,50 @@
   .FUNCTIONALITY
     Converts Group Policy Objects to Configuration Manager Configuration Items (CI).
 
-  .PARAMETER ComputerName
-
-  .PARAMETER DomainTarget
-
-  .PARAMETER ExportOnly
+  .PARAMETER GroupPolicy
+    This is enabled by default and will make the script query only for one specified group policy.
 
   .PARAMETER GpoTarget
-
-  .PARAMETER GroupPolicy
-
-  .PARAMETER LocalPolicy
-
-  .PARAMETER Log
-
-  .PARAMETER Remediate
+    Name of Group Policy Object.
 
   .PARAMETER ResultantSetOfPolicy
+    Utilizes a resultant set of policy to determine the set of applied GPOs. Cannot be used in conjunction with the GroupPolicy option.
 
-  .PARAMETER Severity
+  .PARAMETER ComputerName
+    Name of the device to run RSOP against.
+
+  .PARAMETER DomainTarget
+    Fully qualified domain name.
 
   .PARAMETER SiteCode
+    Configuration Manager Site Code (###)
+
+  .PARAMETER Remediate
+    Enable Configuration Item to Remediate All Non-Compliant Settings.
+
+  .PARAMETER Severity
+    Sets the severity of non-compliant items. (None, Informational, Warning or Critical)
+
+  .PARAMETER ExportOnly
+    Exports the Configuration Item(s) to a CAB file to be manually imported to Configuration Manager.
+
+  .PARAMETER Log
+    Writes all discovered registry keys and their related GPO name to a log file.
 
   .EXAMPLE
+    .\Convert-GPOtoCI.ps1 -GpoTarget "Windows 10 Settings" -DomainTarget kollwitz.local -SiteCode KWZ
+
+  .EXAMPLE
+    .\Convert-GPOtoCI.ps1 -GpoTarget "Windows 10 Settings" -DomainTarget kollwitz.local -SiteCode KWZ -Remediate
+
+  .EXAMPLE
+    .\Convert-GPOtoCI.ps1 -GroupPolicy -GpoTarget "Windows 10 Settings" -DomainTarget kollwitz.local -SiteCode KWZ -Severity Warning
+
+  .EXAMPLE
+    .\Convert-GPOtoCI.ps1 -ResultantSetOfPolicy -ComputerName MyDevice01 -DomainTarget kollwitz.local -SiteCode KWZ
+
+  .EXAMPLE
+    .\Convert-GPOtoCI.ps1 -GpoTarget "Windows 10 Settings" -DomainTarget kollwitz.local -SiteCode KWZ -ExportOnly
 
   .INPUTS
     None.
