@@ -60,4 +60,7 @@ This script must be executed from a system that has access to both the GroupPoli
 
 ### Tested With
 
-Configuration Manager 2103, Configuration Manager 2104 (Technical Preview)
+* Configuration Manager 2103
+* Configuration Manager 2104 (Technical Preview)
+* PowerShell 7.1
+* PowerShell 5.1
