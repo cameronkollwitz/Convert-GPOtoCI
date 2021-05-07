@@ -140,7 +140,7 @@ function Get-GPOKeys {
 <#
   Utilizes the ConfigurationManager PowerShell module to create Configuration Item settings based on registry keys
 #>
-function New-SCCMConfigurationItemSetting {
+function New-CMConfigurationItemsetting {
   [CmdletBinding()]
   Param(
     [Parameter(
@@ -313,7 +313,7 @@ function New-SCCMConfigurationItemRule {
 <#
   Utilizes the ConfigurationManager PowerShell module to create Configuration Items based on previously created settings and rules
 #>
-function New-SCCMConfigurationItems {
+function New-CMConfigurationItems {
   [CmdletBinding()]
   Param(
     [Parameter(
@@ -413,7 +413,7 @@ function New-SCCMConfigurationItems {
     }
 
     if ($value.Length -gt 0) {
-      $settingXml = New-SCCMConfigurationItemSetting -DisplayName $dName -Description ("$keyName - $valueName") -DataType $dataType -Hive $hive -Is64Bit $false `
+      $settingXml = New-CMConfigurationItemsetting -DisplayName $dName -Description ("$keyName - $valueName") -DataType $dataType -Hive $hive -Is64Bit $false `
         -Key $subKey -ValueName $valueName -LogicalName $logicalNameS
 
       if ($dataType -eq 'StringArray') {
@@ -588,7 +588,7 @@ If ($null -ne $gpo) {
     $ciName = $GpoTarget
   }
 
-  New-SCCMConfigurationItems -Name $ciName -Description 'This is a GPO compliance settings that was automatically created via PowerShell.' -CreationType 'WindowsOS' -Severity $Severity -RegistryKeys $gpo
+  New-CMConfigurationItems -Name $ciName -Description 'This is a GPO compliance settings that was automatically created via PowerShell.' -CreationType 'WindowsOS' -Severity $Severity -RegistryKeys $gpo
 
   Set-Location $startingDrive
 
