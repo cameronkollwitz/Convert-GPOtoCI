@@ -7,7 +7,7 @@
     Windows Group Policy
 
   .DESCRIPTION
-    Converts Group Policy Objects to Configuration Manager Configuration Items (CI).
+    Uses both the Configuration Manager and Active Directory PowerShell modules to query for registry keys associated with Group Policies then create the Configuration Items for each of the registry values.
 
   .FUNCTIONALITY
     Converts Group Policy Objects to Configuration Manager Configuration Items (CI).
