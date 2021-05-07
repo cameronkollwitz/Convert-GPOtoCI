@@ -196,7 +196,7 @@ function New-CMConfigurationItemsetting {
 <#
   Utilizes the ConfigurationManager PowerShell module to create Configuration Item rules for previously created CI settings
 #>
-function New-SCCMConfigurationItemRule {
+function New-CMConfigurationItemRule {
   [CmdletBinding()]
   Param(
     [Parameter(
@@ -422,7 +422,7 @@ function New-CMConfigurationItems {
         $operator = 'Equals'
       }
 
-      $ruleXml = New-SCCMConfigurationItemRule -DisplayName ("$valueName - $value - $type") -Description '' -Severity $Severity -Operator $operator -SettingSourceType Registry -DataType $dataType -Method Value -Changeable $Remediate `
+      $ruleXml = New-CMConfigurationItemRule -DisplayName ("$valueName - $value - $type") -Description '' -Severity $Severity -Operator $operator -SettingSourceType Registry -DataType $dataType -Method Value -Changeable $Remediate `
         -Value $value -ValueDataType $dataType -AuthoringScope $authScope -SettingLogicalName $logicalNameS -LogicalName $ruleLogName
 
       # If array returned search arrary for XmlDocument
