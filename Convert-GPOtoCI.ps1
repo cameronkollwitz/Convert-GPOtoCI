@@ -1,47 +1,110 @@
-﻿[CmdletBinding(DefaultParameterSetName = 'GpoMode')]
+﻿<#
+  .SYNOPSIS
+    Converts Group Policy Objects to Configuration Manager Configuration Items (CI).
+
+  .COMPONENT
+    Configuration Manager
+    Windows Group Policy
+
+  .DESCRIPTION
+    Converts Group Policy Objects to Configuration Manager Configuration Items (CI).
+
+  .FUNCTIONALITY
+    Converts Group Policy Objects to Configuration Manager Configuration Items (CI).
+
+  .PARAMETER ComputerName
+
+  .PARAMETER DomainTarget
+
+  .PARAMETER ExportOnly
+
+  .PARAMETER GpoTarget
+
+  .PARAMETER GroupPolicy
+
+  .PARAMETER LocalPolicy
+
+  .PARAMETER Log
+
+  .PARAMETER Remediate
+
+  .PARAMETER ResultantSetOfPolicy
+
+  .PARAMETER Severity
+
+  .PARAMETER SiteCode
+
+  .EXAMPLE
+
+  .INPUTS
+    None.
+
+  .OUTPUTS
+
+  .NOTES
+    Credit: Originally created by Sam M. Roberts <https://github.com/SamMRoberts/Convert-GPOtoCI/>
+
+  .NOTES
+    Date Forked:    2021-05-06
+    Maintainer:     Cameron Kollwitz
+    Last Updated:   2021-05-06
+
+  .LINK
+    https://github.com/cameronkollwitz/Convert-GPOtoCI/
+
+#>
+
+## Set Script Run Requirements
+#Requires -Version 2.0
+
+[CmdletBinding(DefaultParameterSetName = 'GpoMode')]
 Param(
   [Parameter(
     ParameterSetName = 'GpoMode',
     Mandatory = $true)]
-  [string]$GpoTarget, # Name of GPO
+  [String]$GpoTarget, # Name of GPO
   [Parameter(
     Mandatory = $true)]
-  [string]$DomainTarget, # Domain name
+  [String]$DomainTarget, # Domain name
   [Parameter(
     Mandatory = $true)]
-  [string]$SiteCode, # ConfigMgr site code
+  [String]$SiteCode, # ConfigMgr Site Code
   [Parameter(
     Mandatory = $false)]
-  [switch]$ExportOnly, # Switch to disable the creation of CIs and only export to a CAB file
+  [Switch]$ExportOnly, # Switch to disable the creation of CIs and only export to a CAB file
   [Parameter(
     Mandatory = $false)]
-  [switch]$Remediate, # Set remediate non-compliant settings
+  [Switch]$Remediate, # Set remediate non-compliant settings
   [Parameter(
     Mandatory = $false)]
   [ValidateSet('None', 'Informational', 'Warning', 'Critical')]
-  [string]$Severity = 'Informational', # Rule severity
+  [String]$Severity = 'Informational', # Rule severity
   [Parameter(
     ParameterSetName = 'RsopMode',
     Mandatory = $false)]
-  [switch]$ResultantSetOfPolicy, # Uses Resultant Set of Policy instead of specific GPO for values
+  [Switch]$ResultantSetOfPolicy, # Uses Resultant Set of Policy instead of specific GPO for values
   [Parameter(
     ParameterSetName = 'GpoMode',
     Mandatory = $false)]
-  [switch]$GroupPolicy, #  Uses a single GPO for values
+  [Switch]$GroupPolicy, #  Uses a single GPO for values
   [Parameter(
     ParameterSetName = 'RsopMode',
     Mandatory = $true)]
-  [string]$ComputerName, # Computer name to be used for RSOP
+  [String]$ComputerName, # Computer name to be used for RSOP
   [Parameter(
     ParameterSetName = 'RsopMode',
     Mandatory = $false)]
-  [switch]$LocalPolicy, # Switch to enable capturing local group policy when using RSOP mode
+  [Switch]$LocalPolicy, # Switch to enable capturing local group policy when using RSOP mode
   [Parameter(
     Mandatory = $false)]
-  [switch]$Log    # Switch to enable logging all registry keys and their GPOs to a file
+  [Switch]$Log    # Switch to enable logging all registry keys and their GPOs to a file
 )
 
-# Constants
+##*=============================================
+##* VARIABLE DECLARATION
+##*=============================================
+#region VariableDeclaration
+
 $MAX_NAME_LENGTH = 255
 
 $scriptPath = Split-Path -Parent $MyInvocation.MyCommand.Definition
@@ -49,17 +112,28 @@ $scriptDir = Split-Path -Parent $scriptPath
 $startingDrive = (Get-Location).Drive.Name + ':'
 $Global:ouPath = $null
 
-if (($GroupPolicy -eq $false) -and ($ResultantSetOfPolicy -eq $false)) {
+If (($GroupPolicy -eq $false) -and ($ResultantSetOfPolicy -eq $false)) {
   $GroupPolicy = $true
 }
+
+#endregion
+##*=============================================
+##* END VARIABLE DECLARATION
+##*=============================================
+
+##*=============================================
+##* FUNCTION LISTINGS
+##*=============================================
+#region FunctionListings
 
 <#
   Utilizes native GroupPolicy module to query for registry keys assocaited with a given Group Policy
 #>
-function Get-GPOKeys {
-  param(
-    [string]$PolicyName, # Name of group policy
-    [string]$Domain    # Domain name
+
+Function Get-GPOKeys {
+  Param(
+    [String]$PolicyName, # Name of group policy
+    [String]$Domain    # Domain name
   )
 
   If ((Get-Module).Name -contains 'GroupPolicy') {
@@ -86,44 +160,44 @@ function Get-GPOKeys {
   $countUp = $true
 
   # While key count does not increment up
-  while ($countUp) {
+  While ($countUp) {
     $prevCount = $keyCount
     $newKeyList = @()
-    foreach ($gpoKey in $gpoKeys) {
-      try {
+    ForEach ($gpoKey in $gpoKeys) {
+      Try {
         $newKeys = (Get-GPRegistryValue -Name $PolicyName -Domain $Domain -Key $gpoKey -ErrorAction Stop).FullKeyPath    # Gets registry keys
-      } catch [Exception] {
+      } Catch [Exception] {
         If ($_.Exception.Message -notlike '*The following Group Policy registry setting was not found:*') {
           Write-Host $_.Exception.Message -ForegroundColor Red
           Break
         }
       }
       # For each key in list of registry keys
-      foreach ($nKey in $newKeys) {
+      ForEach ($nKey in $newKeys) {
         # If key is not already in list
-        if ($keyList -notcontains $nKey) {
+        If ($keyList -notcontains $nKey) {
           #Write-Verbose $nKey
           $keyList += $nKey
           $keyCount++
         }
-        if ($newKeyList -notcontains $nKey) {
+        If ($newKeyList -notcontains $nKey) {
           $newKeyList += $nKey
         }
       }
     }
     [array]$gpoKeys = $newKeyList
     # If previous key count equals current key count.  (No new keys found; end of list)
-    if ($prevCount -eq $keyCount) {
+    If ($prevCount -eq $keyCount) {
       $countUp = $false
     }
   }
 
   If ($null -ne $newKeys) {
-    foreach ($key in $keyList) {
-      $values += Get-GPRegistryValue -Name $PolicyName -Domain $Domain -Key $key -ErrorAction SilentlyContinue | Select-Object FullKeyPath, ValueName, Value, Type | Where-Object { ($_.Value -ne $null) -and ($_.Value.Length -gt 0) }
+    ForEach ($key in $keyList) {
+      $values += Get-GPRegistryValue -Name $PolicyName -Domain $Domain -Key $key -ErrorAction SilentlyContinue | Select-Object FullKeyPath, ValueName, Value, Type | Where-Object { ($null -ne $_.Value) -and ($_.Value.Length -gt 0) }
     }
-    if ($Log) {
-      foreach ($value in $values) {
+    If ($Log) {
+      ForEach ($value in $values) {
         Write-Log -RegistryKey $value -GPOName $PolicyName
       }
     }
@@ -140,35 +214,35 @@ function Get-GPOKeys {
 <#
   Utilizes the ConfigurationManager PowerShell module to create Configuration Item settings based on registry keys
 #>
-function New-CMConfigurationItemsetting {
+Function New-CMConfigurationItemsetting {
   [CmdletBinding()]
   Param(
     [Parameter(
       Mandatory = $true)]
-    [string]$DisplayName,
+    [String]$DisplayName,
     [Parameter(
       Mandatory = $false)]
-    [string]$Description = '',
+    [String]$Description = '',
     [Parameter(
       Mandatory = $true)]
     [ValidateSet('Int64', 'Double', 'String', 'DateTime', 'Version', 'StringArray')]
-    [string]$DataType,
+    [String]$DataType,
     [Parameter(
       Mandatory = $true)]
     [ValidateSet('HKEY_CLASSES_ROOT', 'HKEY_CURRENT_USER', 'HKEY_LOCAL_MACHINE', 'HKEY_USERS')]
-    [string]$Hive,
+    [String]$Hive,
     [Parameter(
       Mandatory = $true)]
     [bool]$Is64Bit,
     [Parameter(
       Mandatory = $true)]
-    [string]$Key,
+    [String]$Key,
     [Parameter(
       Mandatory = $true)]
-    [string]$ValueName,
+    [String]$ValueName,
     [Parameter(
       Mandatory = $true)]
-    [string]$LogicalName
+    [String]$LogicalName
   )
 
   If ($DisplayName.Length -gt $MAX_NAME_LENGTH) {
@@ -196,37 +270,37 @@ function New-CMConfigurationItemsetting {
 <#
   Utilizes the ConfigurationManager PowerShell module to create Configuration Item rules for previously created CI settings
 #>
-function New-CMConfigurationItemRule {
+Function New-CMConfigurationItemRule {
   [CmdletBinding()]
   Param(
     [Parameter(
       Mandatory = $true)]
-    [string]$DisplayName,
+    [String]$DisplayName,
     [Parameter(
       Mandatory = $false)]
-    [string]$Description = '',
+    [String]$Description = '',
     [Parameter(
       Mandatory = $true)]
     [ValidateSet('None', 'Informational', 'Warning', 'Critical')]
-    [string]$Severity,
+    [String]$Severity,
     [Parameter(
       Mandatory = $true)]
     [ValidateSet('Equals', 'NotEquals', 'GreaterThan', 'LessThan', 'Between', 'GreaterEquals', 'LessEquals', 'BeginsWith', `
         'NotBeginsWith', 'EndsWith', 'NotEndsWith', 'Contains', 'NotContains', 'AllOf', 'OneOf', 'NoneOf')]
-    [string]$Operator,
+    [String]$Operator,
     [Parameter(
       Mandatory = $true)]
     [ValidateSet('Registry', 'IisMetabase', 'WqlQuery', 'Script', 'XPathQuery', 'ADQuery', 'File', 'Folder', 'RegistryKey', 'Assembly')]
-    [string]$SettingSourceType,
+    [String]$SettingSourceType,
     [Parameter(
       Mandatory = $true)]
     [ValidateSet('String', 'Boolean', 'DateTime', 'Double', 'Int64', 'Version', 'FileSystemAccessControl', 'RegistryAccessControl', `
         'FileSystemAttribute', 'StringArray', 'Int64Array', 'FileSystemAccessControlArray', 'RegistryAccessControlArray', 'FileSystemAttributeArray')]
-    [string]$DataType,
+    [String]$DataType,
     [Parameter(
       Mandatory = $true)]
     [ValidateSet('Value', 'Count')]
-    [string]$Method,
+    [String]$Method,
     [Parameter(
       Mandatory = $true)]
     [bool]$Changeable,
@@ -237,16 +311,16 @@ function New-CMConfigurationItemRule {
       Mandatory = $true)]
     [ValidateSet('String', 'Boolean', 'DateTime', 'Double', 'Int64', 'Version', 'FileSystemAccessControl', 'RegistryAccessControl', `
         'FileSystemAttribute', 'StringArray', 'Int64Array', 'FileSystemAccessControlArray', 'RegistryAccessControlArray', 'FileSystemAttributeArray')]
-    [string]$ValueDataType,
+    [String]$ValueDataType,
     [Parameter(
       Mandatory = $true)]
-    [string]$AuthoringScope,
+    [String]$AuthoringScope,
     [Parameter(
       Mandatory = $true)]
-    [string]$SettingLogicalName,
+    [String]$SettingLogicalName,
     [Parameter(
       Mandatory = $true)]
-    [string]$LogicalName
+    [String]$LogicalName
   )
 
   If ($DisplayName.Length -gt $MAX_NAME_LENGTH) {
@@ -260,9 +334,9 @@ function New-CMConfigurationItemRule {
   $resourceID = "ID-$([guid]::NewGuid())"
   #$logicalName = "OperatingSystem_$([guid]::NewGuid())"
 
-  if ($DataType -eq 'StringArray') {
+  If ($DataType -eq 'StringArray') {
     $ruleXml = [xml](Get-Content $templatePath\ruleSA.xml)
-  } else {
+  } Else {
     $ruleXml = [xml](Get-Content $templatePath\rule.xml)
   }
 
@@ -280,30 +354,30 @@ function New-CMConfigurationItemRule {
   $ruleXml.Rule.Expression.Operands.SettingReference.Changeable = $Changeable.ToString().ToLower()
 
   # If registry value type is StringArray
-  if ($DataType -eq 'StringArray') {
+  If ($DataType -eq 'StringArray') {
     $ruleXml.Rule.Expression.Operands.ConstantValueList.DataType = 'StringArray'
     $valueIndex = 0
     # For each value in array of values
-    foreach ($v in $Value) {
+    ForEach ($v in $Value) {
       # if not first value in array add new nodes; else just set the one value
-      if ($valueIndex -gt 0) {
+      If ($valueIndex -gt 0) {
         # if only one index do not specifiy index to copy; else specify the index to copy
-        if ($valueIndex -le 1) {
+        If ($valueIndex -le 1) {
           $newNode = $ruleXml.Rule.Expression.Operands.ConstantValueList.ConstantValue.Clone()
-        } else {
+        } Else {
           $newNode = $ruleXml.Rule.Expression.Operands.ConstantValueList.ConstantValue[0].Clone()
         }
         $ruleXml.Rule.Expression.Operands.ConstantValueList.AppendChild($newNode)
         $ruleXml.Rule.Expression.Operands.ConstantValueList.ConstantValue[$valueIndex].DataType = 'String'
         $ruleXml.Rule.Expression.Operands.ConstantValueList.ConstantValue[$valueIndex].Value = $v
 
-      } else {
+      } Else {
         $ruleXml.Rule.Expression.Operands.ConstantValueList.ConstantValue.DataType = 'String'
         $ruleXml.Rule.Expression.Operands.ConstantValueList.ConstantValue.Value = $v
       }
       $valueIndex++
     }
-  } else {
+  } Else {
     $ruleXml.Rule.Expression.Operands.ConstantValue.DataType = $ValueDataType
     $ruleXml.Rule.Expression.Operands.ConstantValue.Value = $Value
   }
@@ -313,26 +387,27 @@ function New-CMConfigurationItemRule {
 <#
   Utilizes the ConfigurationManager PowerShell module to create Configuration Items based on previously created settings and rules
 #>
-function New-CMConfigurationItems {
+
+Function New-CMConfigurationItems {
   [CmdletBinding()]
   Param(
     [Parameter(
       Mandatory = $true)]
-    [string]$Name,
+    [String]$Name,
     [Parameter(
       Mandatory = $false)]
-    [string]$Description = '',
+    [String]$Description = '',
     [Parameter(
       Mandatory = $true)]
     [ValidateSet('MacOS', 'MobileDevice', 'None', 'WindowsApplication', 'WindowsOS')]
-    [string]$CreationType,
+    [String]$CreationType,
     [Parameter(
       Mandatory = $true)]
     [array]$RegistryKeys,
     [Parameter(
       Mandatory = $false)]
     [ValidateSet('None', 'Informational', 'Warning', 'Critical')]
-    [string]$Severity = 'Informational'    # Rule severity
+    [String]$Severity = 'Informational'    # Rule severity
   )
 
   If ((Get-Module).Name -contains 'ConfigurationManager') {
@@ -359,23 +434,22 @@ function New-CMConfigurationItems {
   $origName = $Name
   #$tmpFileCi = [System.IO.Path]::GetTempFileName()
   # If ResultantSetOfPolicy option is used use the OU path to name the CI xml
-  if ($ResultantSetOfPolicy) {
+  If ($ResultantSetOfPolicy) {
     $ouNoSpace = $Global:ouPath.Replace(' ', '_')
     $ouNoSpace = $ouNoSpace.Replace('/', '_')
     $ciFile = "$scriptPath\$ouNoSpace.xml"
   }
   # If ResultantSetOfPolicy option is not used use the GPO nane to name the CI xml
-  else {
+  Else {
     $gpoNoSpace = $GpoTarget.Replace(' ', '_')
     $ciFile = "$scriptPath\$gpoNoSpace.xml"
   }
 
-
-  for ($i = 1; $i -le 99; $i++) {
+  For ($i = 1; $i -le 99; $i++) {
     $testCI = Get-CMConfigurationItem -Name $Name -Fast
-    if ($null -eq $testCI) {
-      break
-    } else {
+    If ($null -eq $testCI) {
+      Break
+    } Else {
       $Name = $origName + " ($i)"
     }
   }
@@ -385,7 +459,7 @@ function New-CMConfigurationItems {
 
   $ciXml.Save($ciFile)
 
-  foreach ($Key in $RegistryKeys) {
+  ForEach ($Key in $RegistryKeys) {
     $len = ($Key.FullKeyPath.Split('\')).Length
     $keyName = ($Key.FullKeyPath.Split('\'))[$len - 1]
     $valueName = $Key.ValueName
@@ -399,26 +473,26 @@ function New-CMConfigurationItems {
     $ruleLogName = $ciXml.DesiredConfigurationDigest.OperatingSystem.LogicalName
     $authScope = $ciXml.DesiredConfigurationDigest.OperatingSystem.AuthoringScopeId
 
-    if ($Key.Type -eq 'Binary') {
-      continue
+    If ($Key.Type -eq 'Binary') {
+      Continue
     }
-    if ($Key.Type -eq 'ExpandString') {
+    If ($Key.Type -eq 'ExpandString') {
       $dataType = 'String'
-    } elseif ($Key.Type -eq 'MultiString') {
+    } ElseIf ($Key.Type -eq 'MultiString') {
       $dataType = 'StringArray'
-    } elseif ($Key.Type -eq 'DWord') {
+    } ElseIf ($Key.Type -eq 'DWord') {
       $dataType = 'Int64'
-    } else {
+    } Else {
       $dataType = $Key.Type
     }
 
-    if ($value.Length -gt 0) {
+    If ($value.Length -gt 0) {
       $settingXml = New-CMConfigurationItemsetting -DisplayName $dName -Description ("$keyName - $valueName") -DataType $dataType -Hive $hive -Is64Bit $false `
         -Key $subKey -ValueName $valueName -LogicalName $logicalNameS
 
-      if ($dataType -eq 'StringArray') {
+      If ($dataType -eq 'StringArray') {
         $operator = 'AllOf'
-      } else {
+      } Else {
         $operator = 'Equals'
       }
 
@@ -426,11 +500,11 @@ function New-CMConfigurationItems {
         -Value $value -ValueDataType $dataType -AuthoringScope $authScope -SettingLogicalName $logicalNameS -LogicalName $ruleLogName
 
       # If array returned search arrary for XmlDocument
-      if ($ruleXml.count -gt 1) {
-        for ($i = 0; $i -lt ($ruleXml.Count); $i++) {
-          if ($ruleXml[$i].GetType().ToString() -eq 'System.Xml.XmlDocument') {
+      If ($ruleXml.count -gt 1) {
+        For ($i = 0; $i -lt ($ruleXml.Count); $i++) {
+          If ($ruleXml[$i].GetType().ToString() -eq 'System.Xml.XmlDocument') {
             $ruleXml = $ruleXml[$i]
-            continue
+            Continue
           }
         }
       }
@@ -448,9 +522,9 @@ function New-CMConfigurationItems {
     Write-Host 'Deleting Empty Configuration Item...'
     Remove-CMConfigurationItem -Id $ci.CI_ID -Force
     Write-Host 'Creating CAB File...'
-    if ($ResultantSetOfPolicy) {
+    If ($ResultantSetOfPolicy) {
       Export-CAB -Name $Global:ouPath -Path $ciFile
-    } else {
+    } Else {
       Export-CAB -Name $GpoTarget -Path $ciFile
     }
   } Else {
@@ -460,10 +534,10 @@ function New-CMConfigurationItems {
   }
 }
 
-function Export-CAB {
+Function Export-CAB {
   Param(
-    [string]$Name,
-    [string]$Path
+    [String]$Name,
+    [String]$Path
   )
 
   $fileName = $Name.Replace(' ', '_')
@@ -492,12 +566,12 @@ function Export-CAB {
   Remove-Item ($scriptPath + '\' + $fileName + '.xml') -ErrorAction SilentlyContinue
 }
 
-function Get-RSOP {
+Function Get-RSOP {
   [CmdletBinding()]
   Param(
     [Parameter(
       Mandatory = $true)]
-    [string]$ComputerName
+    [String]$ComputerName
   )
 
   $tmpXmlFile = [System.IO.Path]::GetTempFileName()    # Creates temp file for rsop results
@@ -516,21 +590,21 @@ function Get-RSOP {
   $rsopKeys = @()
 
   # Loop through all applied GPOs starting with the last applied
-  for ($x = $rsop.Rsop.ComputerResults.Gpo.Name.Count; $x -ge 1; $x--) {
+  For ($x = $rsop.Rsop.ComputerResults.Gpo.Name.Count; $x -ge 1; $x--) {
     $rsopTemp = @()
     # Get GPO name
     $gpoResults = ($rsop.Rsop.ComputerResults.Gpo | Where-Object { ($_.Link.AppliedOrder -eq $x) -and ($_.Name -ne 'Local Group Policy') } | Select-Object Name).Name
     If ($null -ne $gpoResults) {
       # If name is not null gets registry keys for that GPO and assign to temp value
       $rsopTemp = Get-GpoKeys -PolicyName $gpoResults -Domain $domainName
-      if ($null -eq $Global:ouPath) {
+      If ($null -eq $Global:ouPath) {
         $Global:ouPath = ($rsop.Rsop.ComputerResults.SearchedSom | Where-Object { $_.Order -eq $x } | Select-Object Path).path
       }
     }
     # foreach registry key value in gpo results
-    foreach ($key in $rsopTemp) {
+    ForEach ($key in $rsopTemp) {
       # if a value is not already stored with that FullKeyPath and ValueName store that value
-      if ($null -eq ($rsopKeys | Where-Object { ($_.FullKeyPath -eq $key.FullKeyPath) -and ($_.ValueName -eq $key.ValueName) })) {
+      If ($null -eq ($rsopKeys | Where-Object { ($_.FullKeyPath -eq $key.FullKeyPath) -and ($_.ValueName -eq $key.ValueName) })) {
         $rsopKeys += $key
       }
     }
@@ -541,7 +615,7 @@ function Get-RSOP {
   $rsopKeys
 }
 
-function Write-Log {
+Function Write-Log {
   [CmdletBinding()]
   Param(
     [Parameter(
@@ -549,15 +623,15 @@ function Write-Log {
     [array]$RegistryKey,
     [Parameter(
       Mandatory = $true)]
-    [string]$GPOName
+    [String]$GPOName
   )
 
-  [string]$logPath = 'gpo_registry_discovery_' + (Get-Date -Format MMddyyyy) + '.log'
-  [string]$outString = $GPOName + "`t" + $RegistryKey.FullKeyPath + "`t" + $RegistryKey.ValueName + "`t" + $RegistryKey.Value + "`t" + $RegistryKey.Type
+  [String]$logPath = 'gpo_registry_discovery_' + (Get-Date -Format MMddyyyy) + '.log'
+  [String]$outString = $GPOName + "`t" + $RegistryKey.FullKeyPath + "`t" + $RegistryKey.ValueName + "`t" + $RegistryKey.Value + "`t" + $RegistryKey.Type
   Out-File -FilePath .\$logPath -InputObject $outString -Force -Append
 }
 
-function WriteXmlToScreen ([xml]$xml) {
+Function WriteXmlToScreen ([xml]$xml) {
   $StringWriter = New-Object System.IO.StringWriter;
   $XmlWriter = New-Object System.Xml.XmlTextWriter $StringWriter;
   $XmlWriter.Formatting = 'indented';
@@ -567,24 +641,34 @@ function WriteXmlToScreen ([xml]$xml) {
   Write-Output $StringWriter.ToString();
 }
 
-if ($GroupPolicy) {
+#endregion
+##*=============================================
+##* END FUNCTION LISTINGS
+##*=============================================
+
+##*=============================================
+##* SCRIPT BODY
+##*=============================================
+#region ScriptBody
+
+If ($GroupPolicy) {
   $gpo = Get-GpoKeys -PolicyName $GpoTarget -Domain $DomainTarget
 }
 # If ResultantSetOfPolicy option is used remove the first index of the array that contains RSOP information
-if ($ResultantSetOfPolicy) {
+If ($ResultantSetOfPolicy) {
   $gpo = Get-Rsop -ComputerName $ComputerName
-  if ($null -ne $gpo[0].RsopMode) {
+  If ($null -ne $gpo[0].RsopMode) {
     $gpo = $gpo[1..($gpo.Length - 1)]
   }
 }
 
 If ($null -ne $gpo) {
   # If ResultantSetOfPolicy option is used use the OU path to name the CI
-  if ($ResultantSetOfPolicy -eq $true) {
+  If ($ResultantSetOfPolicy -eq $true) {
     $ciName = $Global:ouPath
   }
   # If ResultantSetOfPolicy option is not used use the target GPO to name the CI
-  elseif ($GroupPolicy -eq $true) {
+  ElseIf ($GroupPolicy -eq $true) {
     $ciName = $GpoTarget
   }
 
@@ -596,3 +680,8 @@ If ($null -ne $gpo) {
 } Else {
   Write-Host '** ERROR! The script will terminate. **' -ForegroundColor Red
 }
+
+#endregion
+##*=============================================
+##* END SCRIPT BODY
+##*=============================================
